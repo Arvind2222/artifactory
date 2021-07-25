@@ -30,6 +30,7 @@ This module is intended to serve as a logical descendant of [pathlib](https://do
   * [Promote Docker image](#promote-docker-image)
 - [Admin area](#admin-area)
   * [User](#user)
+    + [API Keys](#api-keys)
   * [Group](#group)
     + [Internal](#internal)
     + [GroupLDAP](#groupldap)
@@ -313,14 +314,14 @@ is placed in the destination repo.
 
 source.copy(dest)
 for p in dest:
-    print (p)
+    print(p)
 # http://example.com/artifactory/published/production/foo-0.0.1.gz
 # http://example.com/artifactory/published/production/foo-0.0.1.pom
 
 for p in ArtifactoryPath(
     "http://example.com/artifactory/published/product/product/1.0.0.tar"
 ):
-    print (p)
+    print(p)
 # http://example.com/artifactory/published/product/product/1.0.0/product-1.0.0.tar.gz
 # http://example.com/artifactory/published/product/product/1.0.0/product-1.0.0.tar.pom
 
@@ -331,7 +332,7 @@ directly inside our dest as we intended.
 
 source.copy(dest, suppress_layouts=True)
 for p in dest:
-    print (p)
+    print(p)
 """
 http://example.com/artifactory/published/production/foo-0.0.1.gz
 http://example.com/artifactory/published/production/foo-0.0.1.pom
@@ -530,13 +531,39 @@ group = artifactory_.find_group("groupname")
 user.add_to_group(group)
 user.update()  # Don't forget update :)
 
-enc_pwd = user.encryptedPassword
+enc_pwd = user.encrypted_password
 
 # You can re-read from Artifactory
 user.read()
 
 user.delete()
 ```
+
+### API Keys
+~~~python
+from dohq_artifactory import User
+
+user = User(artifactory_, "username")
+
+# create an API key
+user.api_key.create()
+
+# get API key
+user.api_key.get()
+# or using str() method
+my_key = str(user.api_key)
+# or using repr method
+print(user.api_key)
+
+# regenerate API key if one already exists
+user.api_key.regenerate()
+
+# remove API key for current user
+user.api_key.revoke()
+
+# remove all API keys in system, only if user has admin rights
+user.api_key.revoke_for_all_users()
+~~~
 
 ## Group
 ### Internal
