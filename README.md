@@ -1,11 +1,24 @@
-# Python interface library for Jfrog Artifactory #
+# Python interface library for JFrog Artifactory ![](https://img.shields.io/badge/status-supported-green.svg)
 
 
-[![docs](https://img.shields.io/readthedocs/pip.svg)](https://devopshq.github.io/artifactory/)[![dohq-artifactory build Status](https://travis-ci.com/devopshq/artifactory.svg?branch=master)](https://travis-ci.com/devopshq/artifactory) [![dohq-artifactory code quality](https://api.codacy.com/project/badge/Grade/ce32469db9d948bcb56d50532e0c0005)](https://www.codacy.com/app/tim55667757/artifactory/dashboard) [![dohq-artifactory on PyPI](https://img.shields.io/pypi/v/dohq-artifactory.svg)](https://pypi.python.org/pypi/dohq-artifactory) [![dohq-artifactory license](https://img.shields.io/pypi/l/dohq-artifactory.svg)](https://github.com/devopshq/artifactory/blob/master/LICENSE)
+[![docs](https://img.shields.io/readthedocs/pip.svg)][1]
+[![dohq-artifactory build Status](https://app.travis-ci.com/devopshq/artifactory.svg?branch=master)][2] 
+[![dohq-artifactory on PyPI](https://img.shields.io/pypi/v/dohq-artifactory.svg)][3] 
+[![dohq-artifactory license](https://img.shields.io/pypi/l/dohq-artifactory.svg)][4]
 
-This module is intended to serve as a logical descendant of [pathlib](https://docs.python.org/3/library/pathlib.html), a Python 3 module for object-oriented path manipulations. As such, it implements everything as closely as possible to the origin with few exceptions, such as stat().
+`dohq-artifactory` is a live python package for [JFrog Artifactory][5]. This module is intended to serve as a logical 
+descendant of [pathlib][6], and it implements everything as closely as 
+possible to the origin with few exceptions. Current module was forked from outdated 
+[parallels/artifactory][7] and supports all functionality from the original 
+package.
 
-![](https://img.shields.io/badge/status-supported-green.svg)`dohq-artifactory` is a live python package for Jfrog Artifactory. It was forked from outdated [parallels/artifactory](https://github.com/parallels/artifactory) and supports all functionality from the original package.
+[1]: https://devopshq.github.io/artifactory/
+[2]: https://app.travis-ci.com/devopshq/artifactory
+[3]: https://pypi.python.org/pypi/dohq-artifactory
+[4]: https://github.com/devopshq/artifactory/blob/master/LICENSE
+[5]: https://www.jfrog.com/confluence/display/JFROG/JFrog+Artifactory
+[6]: https://docs.python.org/3/library/pathlib.html
+[7]: https://github.com/parallels/artifactory
 
 # Tables of Contents
 
@@ -26,8 +39,12 @@ This module is intended to serve as a logical descendant of [pathlib](https://do
   * [Artifact properties](#artifact-properties)
   * [Repository Scheduled Replication Status](#repository-scheduled-replication-status)
   * [Artifactory Query Language](#artifactory-query-language)
-  * [FileStat](#filestat)
+  * [Artifact Stat](#artifact-stat)
+    + [File/Folder Statistics](#filefolder-statistics)
+    + [Get Download Statistics](#get-download-statistics)
   * [Promote Docker image](#promote-docker-image)
+  * [Builds](#builds)
+  * [Exception handling](#exception-handling)
 - [Admin area](#admin-area)
   * [User](#user)
     + [API Keys](#api-keys)
@@ -37,6 +54,7 @@ This module is intended to serve as a logical descendant of [pathlib](https://do
   * [RepositoryLocal](#repositorylocal)
   * [RepositoryVirtual](#repositoryvirtual)
   * [RepositoryRemote](#repositoryremote)
+  * [Project](#project)
   * [Get repository of any type](#get-repository-of-any-type)
   * [Iterate over repository artifacts](#iterate-over-repository-artifacts)
   * [Access repository child item](#access-repository-child-item)
@@ -48,7 +66,7 @@ This module is intended to serve as a logical descendant of [pathlib](https://do
   * [Session](#session)
   * [SSL Cert Verification Options](#ssl-cert-verification-options)
   * [Timeout on requests](#timeout-on-requests)
-  * [Troubleshooting](#troubleshooting)
+  * [Logging](#logging)
   * [Global Configuration File](#global-configuration-file)
 - [Contribute](#contribute)
 - [Advertising](#advertising)
@@ -70,11 +88,13 @@ pip install dohq-artifactory==0.5.dev243
 ```
 
 # Usage
-
 ## Authentication ##
+
 `dohq-artifactory` supports these ways of authentication:
+
 - Username and password (or [API KEY](https://www.jfrog.com/confluence/display/RTF/Updating+Your+Profile#UpdatingYourProfile-APIKey)) to access restricted resources, you can pass ```auth``` parameter to ArtifactoryPath.
 - [API KEY](https://www.jfrog.com/confluence/display/RTF/Updating+Your+Profile#UpdatingYourProfile-APIKey) can pass with `apikey` parameter.
+- [Access Token](https://www.jfrog.com/confluence/display/JFROG/Access+Tokens#AccessTokens-UsingTokens) can pass with `token` parameter.
 
 ```python
 from artifactory import ArtifactoryPath
@@ -82,6 +102,11 @@ from artifactory import ArtifactoryPath
 # API_KEY
 path = ArtifactoryPath(
     "http://my-artifactory/artifactory/myrepo/restricted-path", apikey="MY_API_KEY"
+)
+
+# Access Token
+path = ArtifactoryPath(
+    "http://my-artifactory/artifactory/myrepo/restricted-path", token="MY_ACCESS_TOKEN"
 )
 
 # User and password OR API_KEY
@@ -117,17 +142,17 @@ path.touch()
 ```
 
 ## Artifactory SaaS
-If you use Artifactory SaaS solution - use `ArtifactorySaaSPath` class
+If you use Artifactory SaaS solution - use `ArtifactorySaaSPath` class.  
+SaaS supports all methods and authentication types as `ArtifactoryPath`. We have to use other class, because as a SaaS 
+service, the URL is different from an on-prem installation and the REST API endpoints.
 ```python
 from artifactory import ArtifactorySaaSPath
 
-# API_KEY
 path = ArtifactorySaaSPath(
     "https://myartifactorysaas.jfrog.io/myartifactorysaas/folder/path.xml",
     apikey="MY_API_KEY",
 )
 ```
-We have to use other class, because as a SaaS service, the URL is different from an on-prem installation and the REST API endpoints.
 
 
 ## Walking Directory Tree ##
@@ -220,17 +245,18 @@ path = ArtifactoryPath(
     "http://my_url:8080/artifactory/my_repo/winx64/aas", auth=("user", "password")
 )
 
-with path.archive(archive_type="zip", check_sum=False) as archive:
+with path.archive(archive_type="zip", check_sum=False).open() as archive:
     with open(r"D:\target.zip", "wb") as out:
         out.write(archive.read())
 
 # download folder archive in chunks
-path.archive().writeto(output="my.zip", chunk_size=100 * 1024)
+path.archive().writeto(out="my.zip", chunk_size=100 * 1024)
 ```
 
 ## Uploading Artifacts ##
 
-Deploy a regular file ```myapp-1.0.tar.gz```
+Deploy a regular file ```myapp-1.0.tar.gz```. This method by default will calculate all available checksums and attach
+them to the file
 
 ```python
 from artifactory import ArtifactoryPath
@@ -243,7 +269,8 @@ path.mkdir()
 path.deploy_file("./myapp-1.0.tar.gz")
 ```
 
-Deploy artifacts from archive: this will automatically extract the contents of the archive on the server preserving the archive's paths
+Deploy artifacts from archive: this will automatically extract the contents of the archive on the server preserving 
+the archive's paths
 
 ```python
 from artifactory import ArtifactoryPath
@@ -256,7 +283,9 @@ path.mkdir()
 path.deploy_file("./myapp-1.0.tar.gz", explode_archive=True)
 ```
 
-Atomically deploy artifacts from archive: this will automatically extract the contents of the archive on the server preserving the archive's paths. This is primarily useful when you want Artifactory to see all the artifacts at once, e.g., for indexing purposes.
+Atomically deploy artifacts from archive: this will automatically extract the contents of the archive on the server 
+preserving the archive's paths. This is primarily useful when you want Artifactory to see all the artifacts at once, 
+e.g., for indexing purposes.
 
 ```python
 from artifactory import ArtifactoryPath
@@ -271,14 +300,66 @@ path.deploy_file(
 )
 ```
 
-Deploy a debian package ```myapp-1.0.deb```
+[Deploy artifact by checksum](https://www.jfrog.com/confluence/display/RTF6X/Artifactory+REST+API#ArtifactoryRESTAPI-DeployArtifactbyChecksum): deploy an artifact to the specified destination by checking if the artifact
+content already exists in Artifactory. If Artifactory already contains a user
+readable artifact with the same checksum the artifact content is copied over to
+the new location without requiring content transfer.
 
 ```python
 from artifactory import ArtifactoryPath
 
-path = ArtifactoryPath("http://my-artifactory/artifactory/ubuntu-local/pool")
+path = ArtifactoryPath("http://my-artifactory/artifactory/my_repo/foo")
+sha1 = "1be5d2dbe52ddee96ef2d17d354e2be0a155a951"
+sha256 = "00bbf80ccca376893d60183e1a714e707fd929aea3e458f9ffda60f7ae75cc51"
+
+# If you don't know sha value, you can calculate it via
+# sha1 = artifactory.sha1sum("local_path_of_your_file")
+# or
+# sha256 = artifactory.sha256sum("local_path_of_your_file")
+
+# Each of the following 4 methods works fine if the artifact content already
+# exists in Artifactory.
+path.deploy_by_checksum(sha1=sha1)
+
+# deploy by sha1 via checksum parameter
+path.deploy_by_checksum(checksum=sha1)
+
+# deploy by sha256 via sha256 parameter
+path.deploy_by_checksum(sha256=sha256)
+
+# deploy by sha256 via checksum parameter
+path.deploy_by_checksum(checksum=sha256)
+```
+
+Deploy a debian package ```myapp-1.0.deb``` to an ```existent``` folder
+
+```python
+from artifactory import ArtifactoryPath
+
+path = ArtifactoryPath("http://my-artifactory/artifactory/ubuntu-local/pool/")
 path.deploy_deb(
     "./myapp-1.0.deb", distribution="trusty", component="main", architecture="amd64"
+)
+```
+
+Deploy a debian package ```myapp-1.0.deb``` to a ```non-existent``` folder
+
+```python
+from artifactory import ArtifactoryPath
+
+path = ArtifactoryPath(
+    "http://my-artifactory/artifactory/ubuntu-local/pool/myapp-1.0.deb"
+)
+path.deploy_deb(
+    "./myapp-1.0.deb", distribution="trusty", component="main", architecture="amd64"
+)
+
+# if you want to set multiple values you can use list to set them
+path.deploy_deb(
+    "./myapp-1.0.deb",
+    distribution=["dist1", "dist2"],
+    component="main",
+    architecture=["amd64", "i386"],
 )
 ```
 
@@ -339,6 +420,9 @@ http://example.com/artifactory/published/production/foo-0.0.1.pom
 http://example.com/artifactory/published/production/product-1.0.0.tar.gz
 http://example.com/artifactory/published/production/product-1.0.0.tar.pom
 """
+
+# you can use dry run just to check if command will succeed without real change, adds debug message
+source.copy(dest, dry_run=True)
 ```
 
 ## Move Artifacts
@@ -357,6 +441,9 @@ source = ArtifactoryPath("http://example.com/artifactory/builds/product/product/
 dest = ArtifactoryPath("http://example.com/artifactory/published/production/")
 
 source.move(dest)
+
+# you can use dry run just to check if command will succeed without real change, adds debug message
+source.move(dest, dry_run=True)
 ```
 
 ## Remove Artifacts
@@ -372,7 +459,8 @@ if path.exists():
 ```
 
 ## Artifact properties ##
-You can get and set (or remove) properties from artifact:
+You can get and set (or remove) properties from artifact.
+Following example shows how to manage properties and property sets
 ```python
 from artifactory import ArtifactoryPath
 
@@ -384,9 +472,17 @@ path = ArtifactoryPath(
 properties = path.properties
 print(properties)
 
-# Update one properties or add if does not exist
+# Update a property or add if does not exist
 properties["qa"] = "tested"
 path.properties = properties
+
+# add/replace set of properties
+new_props = {
+    "test": ["test_property"],
+    "time": ["2018-01-16 12:17:44.135143"],
+    "addthis": ["addthis"],
+}
+path.properties = new_props
 
 # Remove properties
 properties.pop("release")
@@ -417,23 +513,31 @@ You can use [Artifactory Query Language](https://www.jfrog.com/confluence/displa
 ```python
 from artifactory import ArtifactoryPath
 
-aql = ArtifactoryPath(
+arti_path = ArtifactoryPath(
     "http://my-artifactory/artifactory"
 )  # path to artifactory, NO repo
 
 # dict support
 # Send query:
 # items.find({"repo": "myrepo"})
-artifacts = aql.aql("items.find", {"repo": "myrepo"})
+artifacts = arti_path.aql("items.find", {"repo": "myrepo"})
 
 # list support.
 # Send query:
 # items.find().include("name", "repo")
-artifacts = aql.aql("items.find()", ".include", ["name", "repo"])
+artifacts = arti_path.aql("items.find()", ".include", ["name", "repo"])
 
 #  support complex query
-# items.find({"$and": [{"repo": {"$eq": "repo"}}, {"$or": [{"path": {"$match": "*path1"}}, {"path": {"$match": "*path2"}}]}]})
-args = [
+# Example 1
+# items.find(
+#     {
+#         "$and": [
+#             {"repo": {"$eq": "repo"}},
+#             {"$or": [{"path": {"$match": "*path1"}}, {"path": {"$match": "*path2"}}]},
+#         ]
+#     }
+# )
+aqlargs = [
     "items.find",
     {
         "$and": [
@@ -449,18 +553,44 @@ args = [
 ]
 
 # artifacts_list contains raw data (list of dict)
-# Send query:
-# items.find({"$and": [{"repo": {"$eq": "repo"}}, {"$or": [{"path": {"$match": "*path1"}}, {"path": {"$match": "*path2"}}]}]})
-artifacts_list = aql.aql(*args)
+# Send query
+artifacts_list = arti_path.aql(*aqlargs)
+
+# Example 2
+# The query will find all items in repo docker-prod that are of type file and were created after timecode. The
+# query will only display the fields "repo", "path" and "name" and will sort the result ascendingly by those fields.
+# items.find(
+#     {
+#         "$or": [{"repo": "docker-prod"}],
+#         "type": "file",
+#         "created": {"$gt": "2019-07-10T19:20:30.45+01:00"},
+#     }
+# ).include("repo", "path", "name",).sort({"$asc": ["repo", "path", "name"]})
+aqlargs = [
+    "items.find",
+    {
+        "$and": [
+            {"repo": "docker-prod"},
+            {"type": "file"},
+            {"created": {"$gt": "2019-07-10T19:20:30.45+01:00"}},
+        ]
+    },
+    ".include",
+    ["repo", "path", "name"],
+    ".sort",
+    {"$asc": ["repo", "path", "name"]},
+]
+artifacts_list = arti_path.aql(*aqlargs)
 
 # You can convert to pathlib object:
-artifact_pathlib = map(aql.from_aql, artifacts_list)
-artifact_pathlib_list = list(map(aql.from_aql, artifacts_list))
+artifact_pathlib = map(arti_path.from_aql, artifacts_list)
+artifact_pathlib_list = list(map(arti_path.from_aql, artifacts_list))
 ```
 
 
-## FileStat
-You can get hash (`md5`, `sha1`, `sha256`), create date, and change date:
+## Artifact Stat
+### File/Folder Statistics
+You can get hash (`md5`, `sha1`, `sha256`), creator, create date, and change date:
 
 ```python
 from artifactory import ArtifactoryPath
@@ -478,16 +608,101 @@ print(stat.sha256)
 print(stat.ctime)
 print(stat.is_dir)
 print(stat.size)
+print(stat.created_by)
+```
+
+### Get Download Statistics
+Information about number of downloads, user that last downloaded and date of last download
+```python
+from artifactory import ArtifactoryPath
+
+path = ArtifactoryPath(
+    "http://repo.jfrog.org/artifactory/distributions/org/apache/tomcat/apache-tomcat-7.0.11.tar.gz"
+)
+
+# Get FileStat
+download_stat = path.download_stats()
+print(download_stat)
+print(download_stat.last_downloaded)
+print(download_stat.last_downloaded_by)
+print(download_stat.download_count)
+print(download_stat.remote_download_count)
+print(download_stat.remote_last_downloaded)
+print(download_stat.uri)
 ```
 
 ## Promote Docker image
 Promotes a Docker image in a registry to another registry.
-```
+```python
 from artifactory import ArtifactoryPath
 
 path = ArtifactoryPath("http://example.com/artifactory")
 
 path.promote_docker_image("docker-staging", "docker-prod", "my-application", "0.5.1")
+```
+
+## Builds
+```python
+from artifactory import ArtifactoryBuildManager
+
+arti_build = ArtifactoryBuildManager(
+    "https://repo.jfrog.org/artifactory", project="proj_name", auth=("admin", "admin")
+)
+
+# Get all builds
+all_builds = arti_build.builds
+print(all_builds)
+
+# Build Runs
+build1 = all_builds[0]
+all_runs = build1.runs
+print(all_runs)
+
+# Build Info
+build_number1 = all_runs[0]
+print(build_number1.info)
+
+# Builds Diff
+"""
+  Compare a build artifacts/dependencies/environment with an older build to see what 
+  has changed (new artifacts added, old dependencies deleted etc).  
+"""
+print(build_number1.diff(3))
+
+
+# Build Promotion
+"""
+  Change the status of a build, optionally moving or copying the build's artifacts and its dependencies 
+  to a target repository and setting properties on promoted artifacts.  
+  All artifacts from all scopes are included by default while dependencies are not. Scopes are additive (or)
+"""
+
+build_number1.promote(
+    ci_user="admin",
+    properties={"components": ["c1", "c3", "c14"], "release-name": ["fb3-ga"]},
+)
+```
+
+## Exception handling
+Exceptions in this library are represented by `dohq_artifactory.exception.ArtifactoryException` or by `OSError`
+If exception was caused by HTTPError you can always drill down the root cause by using following example:
+```python
+from artifactory import ArtifactoryPath
+from dohq_artifactory.exception import ArtifactoryException
+
+path = ArtifactoryPath(
+    "http://my_arti:8080/artifactory/installer/", auth=("wrong_user", "wrong_pass")
+)
+
+try:
+    path.stat()
+except ArtifactoryException as exc:
+    print(exc)  # clean artifactory error message
+    # >>> Bad credentials
+    print(
+        exc.__cause__
+    )  # HTTP error that triggered exception, you can use this object for more info
+    # >>> 401 Client Error: Unauthorized for url: http://my_arti:8080/artifactory/installer/
 ```
 
 # Admin area
@@ -540,7 +755,7 @@ user.delete()
 ```
 
 ### API Keys
-~~~python
+```python
 from dohq_artifactory import User
 
 user = User(artifactory_, "username")
@@ -563,7 +778,7 @@ user.api_key.revoke()
 
 # remove all API keys in system, only if user has admin rights
 user.api_key.revoke_for_all_users()
-~~~
+```
 
 ## Group
 ### Internal
@@ -677,6 +892,27 @@ repo.read()
 repo.delete()
 ```
 
+## Project
+```python
+# Find
+from artifactory import ArtifactoryPath
+from dohq_artifactory import Project
+
+artifactory_ = ArtifactoryPath(
+    "http://my-artifactory/artifactory/myrepo/restricted-path", token="MY_TOKEN"
+)
+project = artifactory_.find_project("t1k1")
+
+# Create
+if project is None:
+    project = Project(artifactory_, "t1k1", "t1k1_display_name")
+    project.create()
+
+# You can re-read from Artifactory
+project.read()
+
+project.delete()
+```
 
 ## Get repository of any type
 ```python
@@ -1048,6 +1284,7 @@ artifactory_.find_user("name")
 artifactory_.find_group("name")
 artifactory_.find_repository_local("name")
 artifactory_.find_permission_target("name")
+artifactory_.find_project("project_key")
 ```
 
 # Advanced
@@ -1147,50 +1384,57 @@ path = ArtifactoryPath(
 )
 ```
 
-## Troubleshooting ##
-Use [logging](https://docs.python.org/3/library/logging.html) for debug:
+## Logging ##
+The library can be configured to emit logging that will give you better insight into what it's doing.
+Just configure [logging](https://docs.python.org/3/library/logging.html) module in your python script. 
+Simplest example to add debug messages to a console:
 ```python
-def init_logging():
-    logger_format_string = "%(thread)5s %(module)-20s %(levelname)-8s %(message)s"
-    logging.basicConfig(
-        level=logging.DEBUG, format=logger_format_string, stream=sys.stdout
-    )
+import logging
+from artifactory import ArtifactoryPath
 
+logging.basicConfig()
+# set level only for artifactory module, if omitted, then global log level is used, eg from basicConfig
+logging.getLogger("artifactory").setLevel(logging.DEBUG)
 
-init_logging()
 path = ArtifactoryPath(
-    "http://my-artifactory/artifactory/myrepo/restricted-path",
-    auth=("USERNAME", "PASSWORD or API_KEY"),
+    "http://my-artifactory/artifactory/myrepo/restricted-path", apikey="MY_API_KEY"
 )
-
-path.touch()
 ```
 
 
 ## Global Configuration File ##
 
-Artifactory Python module also can specify all connection-related settings in a central file, ```~/.artifactory_python.cfg``` that is read upon the creation of first ```ArtifactoryPath``` object and is stored globally. For instance, you can specify per-instance settings of authentication tokens, so that you won't need to explicitly pass ```auth``` parameter to ```ArtifactoryPath```.
+Artifactory Python module also can specify all connection-related settings in a central file, 
+```~/.artifactory_python.cfg``` that is read upon the creation of first ```ArtifactoryPath``` object and is stored 
+globally. For instance, you can specify per-instance settings of authentication tokens, so that you won't need to 
+explicitly pass ```auth``` parameter to ```ArtifactoryPath```.
 
 Example:
 
 ```ini
+[DEFAULT]
+username = nameforallinstances
+
 [http://artifactory-instance.com/artifactory]
-username = deployer
 password = ilikerandompasswords
 verify = false
 
 [another-artifactory-instance.com/artifactory]
-username = foo
 password = @dmin
 cert = ~/mycert
 ```
 
-Whether or not you specify ```http://``` or ```https://```, the prefix is not essential. The module will first try to locate the best match and then try to match URLs without prefixes. So in the config, if you specify ```https://my-instance.local``` and call ```ArtifactoryPath``` with ```http://my-instance.local```, it will still do the right thing.
+Whether or not you specify ```http://``` or ```https://```, the prefix is not essential. The module will first try to 
+locate the best match and then try to match URLs without prefixes. So in the config, if you specify 
+```https://my-instance.local``` and call ```ArtifactoryPath``` with ```http://my-instance.local```, it will still do 
+the right thing.
 
 
 # Contribute
 [About contributing and testing](docs/CONTRIBUTE.md)
 
 # Advertising
-- [artifactory-du](https://github.com/devopshq/artifactory-du) - estimate file space usage. Summarize disk usage in JFrog Artifactory of the set of FILEs, recursively for directories.
-- [artifactory-cleanup-rules](https://github.com/devopshq/artifactory-du/issues/2) - python-script for Artifactory intelligence cleanup rules with config.
+- [artifactory-du](https://github.com/devopshq/artifactory-du) - estimate file space usage. Summarize disk usage in 
+  JFrog Artifactory of the set of FILEs, recursively for directories.
+- [artifactory-cleanup-rules](https://github.com/devopshq/artifactory-du/issues/2) - python-script for Artifactory 
+  intelligence cleanup rules with config.

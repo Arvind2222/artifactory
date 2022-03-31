@@ -16,12 +16,11 @@ We will be grateful to see you in the ranks of the contributors! We have [some i
 Development takes place on GitHub, where the git-flow branch structure is used:
 
 * ``master`` - contains the latest released code.
-* ``develop`` - is used for development of the next release. **Pull request must be in this branch**
-* ``feature/XXX`` - feature branches are used for development of new features before they are merged to ``develop``.
+* ``feature/XXX`` - feature branches are used for development of new features before they are merged to ``master``.
 
 ### Prepare development environment
 It is recommended to use Unix systems. You can use free Oracle Virtualbox and Ubuntu.  
-Setup script for Ubuntu system (python version might be 3.5+):
+Setup script for Ubuntu system (python version might be 3.6+):
 ```bash
 python3.7 -m pip install -r requirements-dev.txt
 python3.7 -m pytest -munit
@@ -73,7 +72,11 @@ docker run --name artifactory-pro -d -p 8081:8081 -p8082:8082 docker.bintray.io/
 2. Open http://localhost:8081 and wait until it'll be ready
 3. Login with `admin \ password` and complete initialize steps:
    1. Change password to `P@ssw0rd`. It's important to use exactly this password, we hardcoded it in [test.cfg](../tests/test.cfg)
-   2. Install trial license
+   2. Change token to real one in [test.cfg](../tests/test.cfg).
+   [Token authentation](https://www.jfrog.com/confluence/display/JFROG/Access+Tokens)
+   method is for some special components, like
+   [Projects](https://www.jfrog.com/confluence/display/JFROG/Artifactory+REST+API#ArtifactoryRESTAPI-PROJECTS)
+   3. Install trial license
    
 That all, try to run integration tests!
 ```bash
